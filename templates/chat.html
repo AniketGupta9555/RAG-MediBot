@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Medibot — RAG-enabled UI</title>
+<style>
+:root{
+  --bg1:#0f172a; --bg2:#0b1220;
+  --accent:#7c3aed; --accent-2:#06b6d4; --muted: #9aa4b2;
+  --card-radius:18px;
+}
+*{box-sizing:border-box}
+html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;}
+body{
+  background: radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.12), transparent 8%),
+              radial-gradient(900px 400px at 90% 90%, rgba(6,182,212,0.08), transparent 8%),
+              linear-gradient(180deg,var(--bg1), var(--bg2));
+  color: #e6eef8;
+  padding:28px;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* LIGHT THEME OVERRIDES */
+body.light {
+  background: linear-gradient(180deg,#f8fafc,#eef2ff) !important;
+  color: #0b1220 !important;
+}
+body.light .side,
+body.light .chat {
+  background: white !important;
+  color: #0b1220 !important;
+  box-shadow: 0 6px 20px rgba(2,6,23,0.08) !important;
+}
+body.light .msg-user { background: #e6eefc !important; color:#06243a !important; border-color: rgba(37,99,235,0.12) !important; }
+body.light .msg-bot  { background: #e8f9f0 !important; color:#06243a !important; border-color: rgba(16,185,129,0.12) !important; }
+body.light .sources  { background:#f1f5f9 !important; color:#1e293b !important; border-color: rgba(2,6,23,0.04) !important; }
+body.light .suggest{ background:#f8fafc !important; color:#1e293b !important; }
+
+/* layout */
+.shell{ width:100%; max-width:1100px; height:80vh; min-height:560px; display:grid; grid-template-columns:320px 1fr; gap:20px; }
+.side{ border-radius:var(--card-radius); background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); padding:18px; box-shadow:0 8px 30px rgba(2,6,23,0.5); display:flex; flex-direction:column; gap:14px; overflow:hidden;}
+.brand{display:flex; gap:12px; align-items:center;}
+.logo{ width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:white;}
+.h1{font-weight:600;margin:0}
+.desc{color:var(--muted); font-size:13px; margin-top:2px}
+
+/* buttons & lists */
+.btn{padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.03);cursor:pointer;font-size:13px;color:inherit}
+.small{font-size:12px;padding:6px 8px;border-radius:8px}
+.suggests{display:flex;flex-direction:column;gap:8px}
+.suggest{background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:8px;border-radius:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.02); color:var(--muted); font-size:13px}
+
+/* chat */
+.chat{ border-radius:var(--card-radius); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:18px; display:flex; flex-direction:column; gap:12px; box-shadow:0 10px 40px rgba(2,6,23,0.55); overflow:hidden; }
+.chat-header{display:flex;align-items:center;gap:12px}
+.title{font-weight:600;margin:0}
+.sub{color:var(--muted); font-size:13px}
+
+.messages{ flex:1; overflow:auto; padding:12px; display:flex; flex-direction:column; gap:12px; }
+.msg { max-width:78%; padding:12px 14px; border-radius:14px; display:inline-block; position:relative; font-size:14px; line-height:1.35; }
+.msg-user{ align-self:flex-end; background: linear-gradient(90deg, rgba(59,130,246,0.14), rgba(59,130,246,0.06)); color:#dbeafe; border:1px solid rgba(59,130,246,0.12); border-bottom-right-radius:6px;}
+.msg-bot{ align-self:flex-start; background: linear-gradient(90deg, rgba(16,185,129,0.12), rgba(16,185,129,0.04)); color:#ecfdf5; border:1px solid rgba(16,185,129,0.1); border-bottom-left-radius:6px;}
+.meta{display:flex; gap:8px; align-items:center; margin-top:8px; font-size:12px; color:var(--muted)}
+.avatar{ width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:white; background:linear-gradient(135deg,var(--accent),var(--accent-2)); margin-right:8px; box-shadow:0 6px 18px rgba(12,16,30,0.5); }
+
+.row{display:flex;gap:10px; align-items:flex-end;}
+.row.user{flex-direction:row-reverse;}
+.row.user .avatar{background:linear-gradient(135deg,#2563eb,#60a5fa)}
+.row .bubble{display:flex;flex-direction:column;}
+
+/* typing */
+.typing{ display:inline-flex; gap:6px; align-items:center; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.02);}
+.dot{width:7px;height:7px;background:rgba(255,255,255,0.22);border-radius:50%;animation:bounce 1s infinite;}
+@keyframes bounce{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+
+/* composer */
+.composer{display:flex;gap:8px; padding:12px;border-radius:12px;background:linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005)); align-items:center;}
+.textarea{ flex:1; min-height:48px; max-height:140px; resize:none; padding:12px;border-radius:10px; border:1px solid rgba(255,255,255,0.03); background:transparent; color:inherit; outline:none; font-size:14px }
+.icon-btn{background:transparent;border:0;color:var(--muted);cursor:pointer;padding:8px;border-radius:8px}
+
+/* attachments */
+.attach-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.thumb{width:68px;height:48px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,0.06);}
+
+/* sources box */
+.sources{ margin-top:8px; padding:10px; border-radius:10px; background:rgba(0,0,0,0.18); border:1px solid rgba(255,255,255,0.03); font-size:13px; color:var(--muted); white-space:pre-wrap; }
+
+/* responsive */
+@media (max-width:920px){ .shell{grid-template-columns:1fr; height:92vh} .side{order:2} .chat{order:1} }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- LEFT -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">MB</div>
+      <div style="flex:1">
+        <div class="h1">Medibot — Assistant</div>
+        <div class="desc">Context-aware medical help</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;">
+      <!-- fixed stray '<' removed -->
+      <button class="btn small" id="darkToggle" title="Toggle theme">🌓 Theme</button>
+      <button class="btn small" id="clearStorage" title="Clear conversation">🗑️ Clear</button>
+    </div>
+
+    <div style="margin-top:6px;">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Quick prompts</div>
+      <div class="suggests" id="suggests">
+        <div class="suggest">What are common causes of chest pain?</div>
+        <div class="suggest">How to manage high blood pressure at home?</div>
+        <div class="suggest">Side effects of metformin</div>
+        <div class="suggest">Explain COVID-19 vaccine types</div>
+      </div>
+    </div>
+
+    <div style="margin-top:8px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Conversation</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn" id="exportBtn">📤 Export JSON</button>
+        <div class="pill" id="msgCount" style="padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:13px;color:var(--muted)">0 messages</div>
+      </div>
+    </div>
+
+    <div style="margin-top:auto;font-size:12px;color:var(--muted);display:flex;justify-content:space-between">
+      <div>Model: <strong>demo</strong></div>
+      <div>Local · Offline</div>
+    </div>
+  </aside>
+
+  <!-- CHAT -->
+  <main class="chat" role="main" aria-live="polite">
+    <div class="chat-header">
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="avatar" style="width:46px;height:46px;border-radius:12px;">MD</div>
+        <div>
+          <div class="title">Medibot</div>
+          <div class="sub">Context-aware medical assistant</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center"><div class="pill" style="padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:13px;color:var(--muted)">Trusted</div></div>
+    </div>
+
+    <div id="messages" class="messages" aria-live="polite"></div>
+
+    <div class="composer">
+      <div style="display:flex;gap:8px;align-items:center">
+        <label for="fileInput" class="icon-btn" title="Attach image" style="cursor:pointer">📎</label>
+        <input type="file" id="fileInput" accept="image/*" style="display:none">
+      </div>
+
+      <textarea id="input" class="textarea" placeholder="Ask a medical question — press Enter to send (Shift+Enter newline)"></textarea>
+
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:center">
+        <button id="sendBtn" class="btn">Send ➤</button>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+/* ---------------- App state ---------------- */
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+const fileInput = document.getElementById('fileInput');
+const exportBtn = document.getElementById('exportBtn');
+const suggests = document.getElementById('suggests');
+const msgCount = document.getElementById('msgCount');
+
+const darkToggle = document.getElementById('darkToggle');
+const clearStorage = document.getElementById('clearStorage');
+
+let conversation = []; // array of {role, text, time, attachments}
+
+/* ---------------- Utilities ---------------- */
+function nowISO(){ return new Date().toISOString(); }
+function humanTime(iso){ const d=new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+function updateCount(){ msgCount.innerText = conversation.length + " messages"; }
+function scrollBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+/* ---------------- Persistence ---------------- */
+function save(){ localStorage.setItem('medibot_conv_v1', JSON.stringify(conversation)); updateCount(); }
+function load(){
+  const d = localStorage.getItem('medibot_conv_v1');
+  if(d){
+    conversation = JSON.parse(d);
+    messagesEl.innerHTML = '';
+    conversation.forEach(renderMessage);
+    updateCount(); scrollBottom();
+  }
+}
+function clearConv(){ conversation = []; localStorage.removeItem('medibot_conv_v1'); messagesEl.innerHTML = ''; updateCount(); }
+
+/* ---------------- Rendering ---------------- */
+function renderMessage(m){
+  const row = document.createElement('div');
+  row.className = 'row ' + (m.role === 'user' ? 'user' : 'bot');
+  const avatar = document.createElement('div'); avatar.className='avatar'; avatar.textContent = m.role === 'user' ? 'YOU' : 'MB';
+  const bubbleWrap = document.createElement('div'); bubbleWrap.className='bubble';
+
+  const bubble = document.createElement('div'); bubble.className = 'msg ' + (m.role === 'user' ? 'msg-user' : 'msg-bot');
+  bubble.innerHTML = sanitize(m.text || '').replace(/\n/g,'<br>');
+
+  if(m.attachments && m.attachments.length){
+    const rowA = document.createElement('div'); rowA.className = 'attach-row';
+    m.attachments.forEach(a=>{
+      const img = document.createElement('img'); img.src = a.data; img.className='thumb'; rowA.appendChild(img);
+    });
+    bubble.appendChild(rowA);
+  }
+
+  bubbleWrap.appendChild(bubble);
+
+  const meta = document.createElement('div'); meta.className='meta';
+  meta.innerHTML = `<span>${m.role === 'user' ? 'You' : 'Medibot'}</span> • <span>${humanTime(m.time)}</span>`;
+  bubbleWrap.appendChild(meta);
+
+  row.appendChild(avatar); row.appendChild(bubbleWrap);
+  messagesEl.appendChild(row);
+  scrollBottom();
+
+  // if server provided used_chunks, render them under this bubble
+  if(m.used_chunks && m.used_chunks.length){
+    const src = document.createElement('div'); src.className='sources';
+    src.innerHTML = m.used_chunks.map((c,i)=>`Source ${i+1} (${c.source || c.id || 'unknown'} | score:${(c.score||0).toFixed(3)}):\n${(c.text||'').slice(0,1200)}${(c.text && c.text.length>1200?'…':'')}`).join('\n\n---\n\n');
+    messagesEl.appendChild(src);
+    scrollBottom();
+  }
+}
+
+/* sanitize */
+function sanitize(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ---------------- Send flow (wired to real backend) ---------------- */
+async function sendMessage(text, attachments = []){
+  if(!text && attachments.length === 0) return;
+  const userMsg = { role: 'user', text: text, time: nowISO(), attachments };
+  conversation.push(userMsg); renderMessage(userMsg); save();
+  inputEl.value = '';
+
+  const typingEl = showTyping();
+
+  try {
+    // call backend (POST /ask)
+    const json = await callBackendAsk(text, attachments, { top_k: 5, include_sources: true });
+    console.log('Backend /ask response:', json);
+
+    removeTyping(typingEl);
+
+    // attach used_chunks to the bot message so renderMessage prints sources
+    const botMsg = { role: 'bot', text: json.answer || 'No answer returned', time: nowISO(), attachments: [], used_chunks: json.used_chunks || [] };
+    // stream the bot text into UI for nicer UX
+    await streamBotReply(botMsg);
+    conversation.push(botMsg);
+    save();
+
+    // if server sent debug, log it
+    if(json.debug) console.debug('RAG debug:', json.debug);
+  } catch (err) {
+    removeTyping(typingEl);
+    const errMsg = { role: 'bot', text: 'Error communicating with server: ' + err.message, time: nowISO(), attachments: [] };
+    conversation.push(errMsg); renderMessage(errMsg); save();
+    console.error(err);
+  }
+}
+
+/* ---------------- callBackendAsk ---------------- */
+async function callBackendAsk(question, attachments = [], opts = {}) {
+  const lastContext = conversation.slice(-6).map(m => ({ role: m.role, text: m.text, time: m.time }));
+  const payload = {
+    question,
+    attachments,
+    context: lastContext,
+    top_k: opts.top_k ?? 5,
+    include_sources: opts.include_sources ?? true
+  };
+
+  const res = await fetch('/ask', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+
+  if(!res.ok){
+    const txt = await res.text().catch(()=>null);
+    throw new Error('Server error ' + res.status + (txt ? ': ' + txt : ''));
+  }
+
+  const json = await res.json();
+  return json;
+}
+
+/* ---------------- Typing indicator ---------------- */
+function showTyping(){
+  const row = document.createElement('div'); row.className = 'row bot typing-row';
+  const avatar = document.createElement('div'); avatar.className='avatar'; avatar.textContent='MB';
+  const bubbleWrap = document.createElement('div'); bubbleWrap.className='bubble';
+  const t = document.createElement('div'); t.className='typing';
+  t.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div> <div style="font-size:13px;color:var(--muted);margin-left:6px">Medibot is thinking…</div>`;
+  bubbleWrap.appendChild(t); row.appendChild(avatar); row.appendChild(bubbleWrap); messagesEl.appendChild(row); scrollBottom();
+  return row;
+}
+function removeTyping(el){ if(el && el.parentNode) el.parentNode.removeChild(el); }
+
+/* ---------------- Stream bot reply for UX ---------------- */
+async function streamBotReply(botMsgObj){
+  const partial = { role: 'bot', text: '', time: botMsgObj.time, attachments: [] };
+  renderMessage(partial);
+
+  const bubbles = Array.from(messagesEl.querySelectorAll('.msg-bot'));
+  const lastBubble = bubbles[bubbles.length - 1];
+  if(!lastBubble) return;
+
+  const fullText = botMsgObj.text || '';
+  let i = 0;
+  while(i < fullText.length){
+    i += Math.floor(Math.random()*3) + 1;
+    lastBubble.innerHTML = sanitize(fullText.slice(0,i)).replace(/\n/g,'<br>') + `<div style="height:0.6rem"></div>`;
+    scrollBottom();
+    await new Promise(r=>setTimeout(r, 25 + Math.random()*60));
+  }
+
+  if(botMsgObj.used_chunks && botMsgObj.used_chunks.length){
+    const src = document.createElement('div'); src.className='sources';
+    src.innerHTML = botMsgObj.used_chunks.map((c,i)=>`Source ${i+1} (${c.source || c.id || 'unknown'} | score:${(c.score||0).toFixed(3)}):\n${(c.text||'').slice(0,1200)}${(c.text && c.text.length>1200?'…':'')}`).join('\n\n---\n\n');
+    messagesEl.appendChild(src);
+    scrollBottom();
+  }
+}
+
+/* ---------------- File attach & drag/drop ---------------- */
+fileInput.addEventListener('change', async (e)=>{
+  const files = Array.from(e.target.files || []);
+  if(!files.length) return;
+  const atts = [];
+  for(const f of files){
+    if(!f.type.startsWith('image/')) continue;
+    const data = await fileToDataURL(f);
+    atts.push({name: f.name, data});
+  }
+  await sendMessage(inputEl.value.trim(), atts);
+});
+async function fileToDataURL(file){ return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(file); }); }
+
+messagesEl.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+messagesEl.addEventListener('drop', async e=>{ e.preventDefault();
+  const files = Array.from(e.dataTransfer.files || []);
+  if(!files.length) return;
+  const images = files.filter(f=>f.type && f.type.startsWith('image/'));
+  if(images.length){
+    const atts = [];
+    for(const f of images){ atts.push({name: f.name, data: await fileToDataURL(f)}); }
+    await sendMessage(inputEl.value.trim(), atts);
+  }
+});
+
+/* ---------------- Input handlers ---------------- */
+sendBtn.addEventListener('click', ()=> sendMessage(inputEl.value.trim(), []));
+inputEl.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(inputEl.value.trim(), []); } });
+suggests.addEventListener('click', (e)=>{ const s = e.target.closest('.suggest'); if(!s) return; inputEl.value = s.textContent; sendMessage(inputEl.value.trim(), []); });
+
+/* export & clear */
+exportBtn.addEventListener('click', ()=>{ const blob = new Blob([JSON.stringify(conversation, null, 2)], {type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='medibot_conversation.json'; a.click(); URL.revokeObjectURL(url); });
+clearStorage.addEventListener('click', ()=>{ if(confirm('Clear local conversation?')) clearConv(); });
+
+/* ---------------- Theme toggle (fixed + persisted) ---------------- */
+function applyThemeFromStorage(){
+  const t = localStorage.getItem('medibot_theme');
+  if(t === 'light'){
+    document.body.classList.add('light');
+  } else {
+    document.body.classList.remove('light');
+  }
+}
+darkToggle.addEventListener('click', ()=>{
+  document.body.classList.toggle('light');
+  const isLight = document.body.classList.contains('light');
+  localStorage.setItem('medibot_theme', isLight ? 'light' : 'dark');
+  // update lastSeen color text contrast if needed
+});
+applyThemeFromStorage();
+
+/* ---------------- Safety note (only if empty) ---------------- */
+(function addSafety(){
+  const d = localStorage.getItem('medibot_conv_v1');
+  if(!d){
+    const safety = { role:'bot', text: '⚠️ Note: This is a demo UI. For medical emergencies or diagnosis, consult a qualified healthcare professional. This interface does not provide medical advice.', time: nowISO(), attachments: [] };
+    conversation.push(safety); save(); renderMessage(safety);
+  }
+})();
+
+/* ---------------- load ---------------- */
+load();
+updateCount();
+setTimeout(()=>{ /* update small ready text if present */ }, 900);
+
+/* cleanup on unload */
+window.addEventListener('beforeunload', ()=>{ /* no TTS/voice left to cancel */ });
+
+</script>
+</body>
+</html>

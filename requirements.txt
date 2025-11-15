@@ -1,0 +1,23 @@
+flask
+flask-cors
+pinecone-client==3.2.2
+sentence-transformers
+protobuf
+requests
+numpy
+tqdm
+python-dotenv
+
+# Optional (for PDF parsing)
+pypdf
+pdfminer.six
+
+# Transformers (not required for Ollama, but keep for fallback)
+transformers==4.40.0
+accelerate
+
+# Ollama Python client (for local LLM calls)
+ollama
+
+# If you use Jinja templates
+jinja2
