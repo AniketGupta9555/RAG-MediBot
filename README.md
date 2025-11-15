@@ -1,57 +1,34 @@
+
 MediBot – RAG Powered Medical Assistant
 
-MediBot is a Retrieval-Augmented Generation (RAG) based medical chatbot that answers symptom-based and disease-related queries using medical PDFs.
-It uses:
-
-PDF → text extraction
-
-Text cleaning & chunking
-
-Embedding generation (Gemini/Gecko)
-
-Pinecone vector database for similarity search
-
-LLM for context-aware answers
+MediBot is a Retrieval-Augmented Generation (RAG) medical assistant built using Flask.
+It answers symptom-based and disease-related queries using medical PDFs, embeddings, and a vector database.
 
 🚀 Features
 
-Upload medical PDFs as knowledge base
+Upload medical PDFs to build the knowledge base
 
-Query any symptom or disease
+Extract, clean, and chunk text
 
-Accurate, document-grounded answers
+Generate embeddings and store them in a vector DB (Pinecone/FAISS)
 
-Uses embeddings for similarity search
+Retrieve top-k relevant chunks for any query
 
-Fully integrated Streamlit frontend
+LLM generates accurate, context-grounded medical responses
+
+Safe, fast, and explainable medical assistant
 
 🛠 Tech Stack
 
-Python
-
 Flask
 
-Pinecone
+Sentence Transformers / Gemini Embeddings
 
-Google Gemini / Llama / OpenAI
-
-Sentence Transformers
+Pinecone or FAISS
 
 PyPDF
 
-🧠 RAG Pipeline
-
-Extract text from PDF
-
-Chunk into 300–500 token segments
-
-Generate embeddings
-
-Store in Pinecone
-
-Query → embed → retrieve top-k chunks
-
-LLM generates safe, context-grounded answer
+Python-dotenv
 
 ▶ Run Locally
 pip install -r requirements.txt
